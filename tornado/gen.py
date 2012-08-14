@@ -211,6 +211,30 @@ class WaitAll(YieldPoint):
     def get_result(self):
         return [self.runner.pop_result(key) for key in self.keys]
 
+class WaitAny(WaitAll):
+    """`WaitAny` is async `WaitAll`
+    Returns result incrementally when one of the 
+    HTTPClient has returned result.
+    Usage ::: 
+    http_client.fetch("http://google.com",
+                      callback=(yield tornado.gen.Callback("key1")))
+
+    http_client.fetch("http://python.org",
+                      callback=(yield tornado.gen.Callback("key2")))
+    keys = set(["key1", "key2"])
+    while keys:
+        key, response = yield WaitAny(keys)
+        keys.remove(key)
+        # do something with response
+    """
+    def is_ready(self):
+        return any(self.runner.is_ready(key) for key in self.keys)
+
+    def get_result(self):
+        for key in self.keys:
+            if self.runner.is_ready(key):
+                return (key, self.runner.pop_result(key))
+        raise Exception("no results found")
 
 class Task(YieldPoint):
     """Runs a single asynchronous operation.
